@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query Results Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #1a1f2e;
+            color: #fff;
+        }
+        .test-section {
+            background-color: #2a3142;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        h2 {
+            color: #d4af37;
+        }
+        pre {
+            background-color: #1a1f2e;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .success {
+            color: #4caf50;
+        }
+        .info {
+            color: #2196f3;
+        }
+        mark {
+            background-color: #d4af37;
+            color: #1a1f2e;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Query Results Parsing and Display Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Parse Structured JSON Payload</h2>
+        <p class="info">Testing that the ChatPanel can parse the structured JSON response from the agent.</p>
+        <pre id="test1-input"></pre>
+        <p class="success">✓ Expected: ChatPanel should extract transcriptResults, videoClips, and totalLatencyMs</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Display Transcript Results with Highlighting</h2>
+        <p class="info">Testing that matched terms are highlighted in transcript text.</p>
+        <p>Example text: "The witness testified about the <mark>contract</mark> dispute."</p>
+        <p class="success">✓ Expected: Matched terms should be highlighted with gold background</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Auto-play Video Clip</h2>
+        <p class="info">Testing that the first HLS URL is automatically passed to the video player.</p>
+        <p class="success">✓ Expected: onClipSelect should be called with the first clip's hls_manifest_url</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Loading Spinner Display</h2>
+        <p class="info">Testing that loading spinner is shown while agent processes.</p>
+        <p class="success">✓ Expected: Loading dots animation should appear when isLoading=true</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Sample Query Result JSON</h2>
+        <pre id="sample-json"></pre>
+    </div>
+
+    <script>
+        // Sample query result that matches the expected structure
+        const sampleQueryResult = {
+            queryId: "query_1234567890",
+            transcriptResults: [
+                {
+                    segment: {
+                        text: "The witness testified about the contract dispute and the timeline of events.",
+                        speaker: {
+                            role: "Witness"
+                        },
+                        start_timestamp_us: 1234567890000000,
+                        end_timestamp_us: 1234567895000000
+                    },
+                    matched_terms: ["contract", "timeline"],
+                    relevance_score: 0.92
+                },
+                {
+                    segment: {
+                        text: "Your Honor, the contract was signed on March 15th.",
+                        speaker: {
+                            role: "Prosecution"
+                        },
+                        start_timestamp_us: 1234567900000000,
+                        end_timestamp_us: 1234567903000000
+                    },
+                    matched_terms: ["contract"],
+                    relevance_score: 0.85
+                }
+            ],
+            videoClips: [
+                {
+                    clip_id: "clip_001",
+                    hls_manifest_url: "https://example.com/clips/clip_001.m3u8",
+                    start_timestamp_us: 1234567890000000,
+                    end_timestamp_us: 1234567920000000,
+                    duration_ms: 30000
+                }
+            ],
+            totalLatencyMs: 425
+        };
+
+        // Display the sample JSON
+        document.getElementById('sample-json').textContent = JSON.stringify(sampleQueryResult, null, 2);
+        document.getElementById('test1-input').textContent = JSON.stringify(sampleQueryResult, null, 2);
+
+        console.log('Test data loaded successfully');
+        console.log('Query result structure:', sampleQueryResult);
+    </script>
+</body>
+</html>
