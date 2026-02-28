@@ -1,0 +1,165 @@
+.latency-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, var(--navy-light) 0%, var(--navy-medium) 100%);
+  border-radius: 24px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.latency-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.latency-indicator {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.latency-indicator::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--gray-light);
+  z-index: 1;
+}
+
+.ping-wave {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-light);
+  opacity: 0;
+}
+
+/* Idle state */
+.latency-badge.idle .latency-indicator::before {
+  background-color: var(--gray-light);
+}
+
+/* Excellent state (sub-500ms) - animated ping */
+.latency-badge.excellent .latency-indicator::before {
+  background-color: var(--success);
+  animation: pulse-core 2s ease-in-out infinite;
+}
+
+.latency-badge.excellent .ping-wave {
+  border-color: var(--success);
+  animation: ping-wave 2s ease-out infinite;
+}
+
+.latency-badge.excellent .ping-wave:nth-child(2) {
+  animation-delay: 1s;
+}
+
+/* Warning state */
+.latency-badge.warning .latency-indicator::before {
+  background-color: var(--warning);
+  animation: pulse-core 1.5s ease-in-out infinite;
+}
+
+.latency-badge.warning .ping-wave {
+  border-color: var(--warning);
+}
+
+/* Error state */
+.latency-badge.error .latency-indicator::before {
+  background-color: var(--error);
+  animation: pulse-core 1s ease-in-out infinite;
+}
+
+.latency-badge.error .ping-wave {
+  border-color: var(--error);
+}
+
+@keyframes pulse-core {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes ping-wave {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.latency-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.latency-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-light);
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.latency-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--white);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+}
+
+.latency-badge.excellent .latency-value {
+  color: var(--success);
+}
+
+.latency-badge.warning .latency-value {
+  color: var(--warning);
+}
+
+.latency-badge.error .latency-value {
+  color: var(--error);
+}
+
+.latency-status {
+  font-size: 0.7rem;
+  color: var(--success);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  animation: fade-in 0.3s ease-in;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
