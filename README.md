@@ -568,9 +568,14 @@ Contributions are welcome! Whether you're fixing bugs, adding features, improvin
 
 <div align="center">
 
-## Developer
+## Developers
 
-[Keerthivasan Venkitajalam](https://github.com/Keerthivasan-Venkitajalam)
+| Dev                     | GitHub Profile                                                                 |
+|-------------------------|-------------------------------------------------------------------------------|
+| Keerthivasan S V        | [Keerthivasan-Venkitajalam](https://github.com/Keerthivasan-Venkitajalam)     |
+| Sri Krishna Vundavalli  | [Sri-Krishna-V](https://github.com/Sri-Krishna-V/)                            |
+| Kavinesh                | [Kavinesh11](https://github.com/Kavinesh11)                                   |
+| Sai Nivedh              | [SaiNivedh26](https://github.com/SaiNivedh26)                                 |
 
 **Courtroom Video Analyzer Agent** is a production-ready multimodal AI system built for real-time legal proceedings analysis.
 
