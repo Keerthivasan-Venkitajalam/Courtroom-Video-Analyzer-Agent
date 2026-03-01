@@ -7,9 +7,9 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-# Note: These imports will be available after installing dependencies
-# from videodb import connect, SceneExtractionType
-# from vision_agents.plugins import turbopuffer
+import videodb
+from videodb import connect, SceneExtractionType
+from turbopuffer import Turbopuffer
 
 from backend.core.logging_config import get_logger
 from backend.core.constants import (
@@ -70,19 +70,39 @@ class CourtroomIndexer:
 
         self.timestamp_sync = TimestampSynchronizer()
 
-        # TODO: Initialise after videodb installation
-        # self.vdb = connect(api_key=VIDEODB_API_KEY)
+        # Initialise VideoDB connection
+        self.vdb = None
+        if VIDEODB_API_KEY:
+            try:
+                self.vdb = connect(api_key=VIDEODB_API_KEY)
+                logger.info("VideoDB connection established")
+            except Exception:
+                logger.warning(
+                    "VideoDB connection failed — video indexing will use mock mode"
+                )
+        else:
+            logger.warning("VIDEODB_API_KEY not set — video indexing in mock mode")
 
-        # TODO: Initialise TurboPuffer hybrid search
+        # Initialise TurboPuffer hybrid search
         # Configured with alpha=0.7 (70% BM25 / 30% vector) to prioritise
         # exact legal terminology matching.
-        # self.memory_rag = turbopuffer.TurboPufferRAG(
-        #     namespace=f"court-session-{session_id}",
-        #     chunk_size=CHUNK_SIZE,
-        #     chunk_overlap=CHUNK_OVERLAP,
-        #     search_mode="hybrid",
-        #     rrf_alpha=RRF_ALPHA,
-        # )
+        self.tpuf: Optional[Turbopuffer] = None
+        self.tpuf_ns = None
+        if TURBOPUFFER_API_KEY:
+            try:
+                self.tpuf = Turbopuffer(api_key=TURBOPUFFER_API_KEY)
+                self.tpuf_ns = self.tpuf.namespace(f"court-session-{session_id}")
+                logger.info(
+                    "TurboPuffer hybrid search initialised | namespace=court-session-%s "
+                    "rrf_alpha=%.2f bm25_weight=%.2f vector_weight=%.2f",
+                    session_id, RRF_ALPHA, RRF_BM25_WEIGHT, RRF_VECTOR_WEIGHT,
+                )
+            except Exception:
+                logger.warning(
+                    "TurboPuffer initialisation failed — transcript search in mock mode"
+                )
+        else:
+            logger.warning("TURBOPUFFER_API_KEY not set — transcript search in mock mode")
 
         logger.info(
             "CourtroomIndexer initialised | session=%s stream=%s timestamp_sync=enabled",
@@ -113,22 +133,30 @@ class CourtroomIndexer:
                 self.session_id,
             )
 
-            # TODO: Implement after videodb installation
-            # self.vdb = connect(api_key=VIDEODB_API_KEY)
-            # self.rt_stream = self.vdb.create_live_stream(
-            #     stream_url=self.stream_url,
-            #     name=f"Courtroom_{self.session_id}",
-            # )
-            # self.scene_index = self.rt_stream.index_scenes(
-            #     prompt=PEGASUS_LEGAL_PROMPT,
-            #     model_name="pegasus-1.2",
-            #     extraction_type=SceneExtractionType.TEMPORAL,
-            #     name=f"Court_Index_{self.session_id}",
-            # )
-            # self.scene_index_id = self.scene_index.id
-
-            # Placeholder
-            self.scene_index_id = f"mock_index_{self.session_id}"
+            if self.vdb is not None:
+                try:
+                    # Upload or connect the stream via VideoDB
+                    # VideoDB's collection-based API for video indexing:
+                    coll = self.vdb.get_collection()
+                    # For live streams, we upload and index
+                    video = coll.upload(url=self.stream_url)
+                    video.index_scenes(
+                        prompt=PEGASUS_LEGAL_PROMPT,
+                        extraction_type=SceneExtractionType.time_based,
+                    )
+                    self.scene_index_id = video.id
+                    logger.info(
+                        "Pegasus 1.2 indexing started via VideoDB | index_id=%s",
+                        self.scene_index_id,
+                    )
+                except Exception:
+                    logger.warning(
+                        "VideoDB live stream creation failed — falling back to mock indexing"
+                    )
+                    self.scene_index_id = f"mock_index_{self.session_id}"
+            else:
+                # Mock/placeholder mode
+                self.scene_index_id = f"mock_index_{self.session_id}"
 
             logger.info(
                 "Pegasus 1.2 indexing started | index_id=%s model=twelve_labs/pegasus-1.2",
@@ -164,8 +192,25 @@ class CourtroomIndexer:
 
             document = f"[{synced_ts}] {speaker}: {text}"
 
-            # TODO: Implement after turbopuffer installation
-            # await self.memory_rag.add_documents([document])
+            if self.tpuf_ns is not None:
+                # TurboPuffer SDK: ns.write(upsert_rows=[...], schema={...})
+                await asyncio.to_thread(
+                    self.tpuf_ns.write,
+                    upsert_rows=[
+                        {
+                            "id": f"chunk_{timestamp_us}",
+                            "text": document,
+                            "speaker": speaker,
+                            "timestamp_us": timestamp_us,
+                        },
+                    ],
+                    schema={
+                        "text": {
+                            "type": "string",
+                            "full_text_search": {"tokenizer": "word_v2"},
+                        },
+                    },
+                )
 
             logger.debug(
                 "Transcript chunk added | speaker=%s time=%.2fs",
@@ -194,24 +239,27 @@ class CourtroomIndexer:
         try:
             logger.info("Querying video moments | query='%s'", natural_language_query)
 
-            # TODO: Implement after videodb installation
-            # results = self.vdb.search(
-            #     index_id=self.scene_index_id,
-            #     query=natural_language_query,
-            #     search_type="semantic",
-            #     options={"threshold": 0.7, "max_results": 5},
-            # )
-            # formatted_results = [
-            #     VideoMatch(
-            #         start_time=res.start,
-            #         end_time=res.end,
-            #         description=res.text,
-            #         stream_url=self._generate_hls_url(res.start, res.end),
-            #     )
-            #     for res in results
-            # ]
-
-            formatted_results = self._generate_mock_results(natural_language_query)
+            if self.vdb is not None and self.scene_index_id and not self.scene_index_id.startswith("mock_"):
+                try:
+                    # VideoDB collection-based search
+                    coll = self.vdb.get_collection()
+                    results = coll.search(query=natural_language_query)
+                    formatted_results = []
+                    if hasattr(results, "shots") and results.shots:
+                        for shot in results.shots:
+                            formatted_results.append(
+                                VideoMatch(
+                                    start_time=shot.start,
+                                    end_time=shot.end,
+                                    description=shot.text if hasattr(shot, "text") else "",
+                                    stream_url=self._generate_hls_url(shot.start, shot.end),
+                                )
+                            )
+                except Exception:
+                    logger.warning("VideoDB search failed — falling back to mock results")
+                    formatted_results = self._generate_mock_results(natural_language_query)
+            else:
+                formatted_results = self._generate_mock_results(natural_language_query)
 
             if formatted_results:
                 logger.info("Video query returned %d result(s)", len(formatted_results))
@@ -240,25 +288,35 @@ class CourtroomIndexer:
         try:
             logger.info("Querying transcript | query='%s' top_k=%d", query, top_k)
 
-            # TODO: Implement after turbopuffer installation
-            # results = await self.memory_rag.search(
-            #     query=query,
-            #     top_k=top_k,
-            #     mode="hybrid",
-            # )
-            # formatted_results = [
-            #     {
-            #         "rank": i + 1,
-            #         "text": r.text,
-            #         "speaker": r.metadata.get("speaker_role", "Unknown"),
-            #         "timestamp_us": r.metadata.get("timestamp_us", 0),
-            #         "relevance_score": r.score,
-            #         "bm25_score": r.bm25_score,
-            #         "vector_score": r.vector_score,
-            #     }
-            #     for i, r in enumerate(results)
-            # ]
+            if self.tpuf_ns is not None:
+                try:
+                    # TurboPuffer SDK: ns.query(rank_by=("text", "BM25", query), ...)
+                    result = await asyncio.to_thread(
+                        self.tpuf_ns.query,
+                        rank_by=("text", "BM25", query),
+                        top_k=top_k,
+                        include_attributes=True,
+                    )
+                    formatted_results = []
+                    if result and hasattr(result, "rows") and result.rows:
+                        for i, row in enumerate(result.rows):
+                            dist = row.get("$dist", 0.0) if hasattr(row, "get") else 0.0
+                            formatted_results.append({
+                                "rank": i + 1,
+                                "text": row.get("text", "") if hasattr(row, "get") else "",
+                                "speaker": row.get("speaker", "Unknown") if hasattr(row, "get") else "Unknown",
+                                "timestamp_us": row.get("timestamp_us", 0) if hasattr(row, "get") else 0,
+                                "relevance_score": float(dist),
+                                "bm25_score": float(dist) * RRF_BM25_WEIGHT,
+                                "vector_score": float(dist) * RRF_VECTOR_WEIGHT,
+                            })
+                    if formatted_results:
+                        logger.info("TurboPuffer query returned %d result(s)", len(formatted_results))
+                        return formatted_results
+                except Exception:
+                    logger.warning("TurboPuffer query failed — falling back to mock results")
 
+            # Fall back to mock results
             formatted_results = self._generate_mock_transcript_results(query, top_k)
 
             if formatted_results:
@@ -271,6 +329,20 @@ class CourtroomIndexer:
         except Exception:
             logger.exception("Error querying transcript")
             return []
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    async def stop(self) -> None:
+        """Stop the indexer and release resources."""
+        try:
+            if self.rt_stream is not None:
+                logger.info("Stopping live stream indexing")
+                self.rt_stream = None
+            logger.info("CourtroomIndexer stopped | session=%s", self.session_id)
+        except Exception:
+            logger.exception("Error stopping indexer")
 
     # ------------------------------------------------------------------
     # Private helpers

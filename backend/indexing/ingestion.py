@@ -4,8 +4,10 @@ Transcript segment ingestion into TurboPuffer RAG.
 Handles diarised transcript segments with speaker role metadata.
 """
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+
+from turbopuffer import Turbopuffer
 
 from backend.core.logging_config import get_logger
 from backend.core.constants import (
@@ -15,9 +17,6 @@ from backend.core.constants import (
     SPEAKER_ROLES,
     get_unified_timestamp_us,
 )
-
-# Note: TurboPuffer client will be installed separately
-# from turbopuffer import TurboPuffer
 
 logger = get_logger(__name__)
 
@@ -47,7 +46,8 @@ class TranscriptIngestion:
         """
         self.session_id = session_id
         self.namespace = f"court-session-{session_id}"
-        self.client = None
+        self.tpuf: Optional[Turbopuffer] = None
+        self.tpuf_ns = None
         self.ingested_count: int = 0
 
         logger.info(
@@ -59,9 +59,25 @@ class TranscriptIngestion:
 
     async def initialize(self) -> None:
         """Initialise the TurboPuffer client and create the namespace."""
-        # TODO: Implement after turbopuffer installation
-        # self.client = TurboPuffer(api_key=TURBOPUFFER_API_KEY)
-        # await self.client.create_namespace(self.namespace)
+        if TURBOPUFFER_API_KEY:
+            try:
+                self.tpuf = Turbopuffer(api_key=TURBOPUFFER_API_KEY)
+                self.tpuf_ns = self.tpuf.namespace(self.namespace)
+                logger.info(
+                    "TurboPuffer client connected | namespace=%s",
+                    self.namespace,
+                )
+            except Exception:
+                logger.warning(
+                    "TurboPuffer client initialisation failed — ingestion will be in mock mode"
+                )
+                self.tpuf = None
+                self.tpuf_ns = None
+        else:
+            logger.warning(
+                "TURBOPUFFER_API_KEY not set — ingestion running in mock mode"
+            )
+
         logger.info("TurboPuffer namespace ready | namespace=%s", self.namespace)
 
     # ------------------------------------------------------------------
@@ -93,16 +109,31 @@ class TranscriptIngestion:
         try:
             formatted = self.format_segment(segment)
 
-            # TODO: Implement actual TurboPuffer upsert
-            # document = {
-            #     "id": f"seg_{segment.timestamp_us}",
-            #     "text": formatted,
-            #     "speaker_id": segment.speaker_id,
-            #     "speaker_role": segment.speaker_role,
-            #     "timestamp_us": segment.timestamp_us,
-            #     "confidence": segment.confidence,
-            # }
-            # await self.client.upsert(namespace=self.namespace, documents=[document])
+            if self.tpuf_ns is not None:
+                # TurboPuffer SDK: ns.write(upsert_rows=[...], schema={...})
+                await asyncio.to_thread(
+                    self.tpuf_ns.write,
+                    upsert_rows=[
+                        {
+                            "id": f"seg_{segment.timestamp_us}",
+                            "text": formatted,
+                            "speaker_id": segment.speaker_id,
+                            "speaker_role": segment.speaker_role,
+                            "timestamp_us": segment.timestamp_us,
+                            "confidence": segment.confidence,
+                        },
+                    ],
+                    schema={
+                        "text": {
+                            "type": "string",
+                            "full_text_search": {"tokenizer": "word_v2"},
+                        },
+                    },
+                )
+                logger.debug(
+                    "Upserted segment to TurboPuffer | id=seg_%d",
+                    segment.timestamp_us,
+                )
 
             self.ingested_count += 1
             logger.debug(

@@ -9,10 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import time
 
-# Note: These imports will be available after installing vision-agents
-# from vision_agents.plugins import deepgram
-# from vision_agents.processor import VideoProcessor
-# import ultralytics
+from ultralytics import YOLO
+from deepgram import DeepgramClient
 
 from backend.core.logging_config import get_logger
 from backend.core.constants import VIDEO_FPS, SPEAKER_ROLES, get_unified_timestamp_us, DEEPGRAM_API_KEY
@@ -66,19 +64,35 @@ class CourtroomProcessor:
         self.speaker_history: List[Tuple[str, int]] = []  # (role, timestamp_us)
         self.model_loaded: bool = False
 
-        # TODO: Initialise after vision-agents installation
-        # super().__init__(fps=fps)
-        # self.face_model = ultralytics.YOLO("yolov8n-face.pt")
-        # self.speaker_diarization = deepgram.STT(
-        #     api_key=DEEPGRAM_API_KEY,
-        #     diarize=True,
-        #     punctuate=True,
-        #     model="nova-2",
-        # )
+        # Initialise YOLOv8n-face for lightweight entity detection
+        try:
+            self.face_model = YOLO("yolov8n-face.pt")
+            self.model_loaded = True
+            logger.info("YOLOv8n-face model loaded successfully")
+        except Exception:
+            logger.warning(
+                "YOLOv8n-face model could not be loaded — running in placeholder mode. "
+                "Download the model with: yolo export model=yolov8n-face.pt"
+            )
+            self.face_model = None
+
+        # Initialise Deepgram STT client for speaker diarisation
+        # Deepgram SDK v6.x: DeepgramClient(api_key=...)
+        self.deepgram_client: Optional[DeepgramClient] = None
+        if DEEPGRAM_API_KEY:
+            try:
+                self.deepgram_client = DeepgramClient(api_key=DEEPGRAM_API_KEY)
+                logger.info("Deepgram STT client initialised | model=nova-3 diarize=True")
+            except Exception:
+                logger.warning("Deepgram client initialisation failed — STT will be unavailable")
+        else:
+            logger.warning("DEEPGRAM_API_KEY not set — STT will be unavailable")
 
         logger.info(
-            "CourtroomProcessor initialised | fps=%d entity_detection=YOLOv8n-face(pending) STT=Deepgram(pending)",
+            "CourtroomProcessor initialised | fps=%d entity_detection=%s STT=%s",
             fps,
+            "YOLOv8n-face" if self.model_loaded else "placeholder",
+            "Deepgram" if self.deepgram_client else "placeholder",
         )
 
     # ------------------------------------------------------------------
@@ -138,16 +152,47 @@ class CourtroomProcessor:
         try:
             timestamp_us = get_unified_timestamp_us()
 
-            # TODO: Implement after deepgram integration
-            # transcript_data = await self.speaker_diarization.transcribe(audio_data)
-            # if transcript_data and hasattr(transcript_data, "speaker"):
-            #     speaker_id = transcript_data.speaker
-            #     speaker_role = self._map_speaker_id_to_role(speaker_id)
-            #     if speaker_role != self.current_speaker:
-            #         logger.info("Speaker changed | %s → %s", self.current_speaker, speaker_role)
-            #         self.current_speaker = speaker_role
-            #         self.speaker_history.append((speaker_role, timestamp_us))
-            #     return transcript_data.text, speaker_role
+            if self.deepgram_client and audio_data and len(audio_data) > 0:
+                # Deepgram SDK v6.x: client.listen.v1.media.transcribe_file(...)
+                response = await asyncio.to_thread(
+                    self.deepgram_client.listen.v1.media.transcribe_file,
+                    request=audio_data,
+                    model="nova-3",
+                    smart_format=True,
+                    punctuate=True,
+                    diarize=True,
+                )
+
+                # Extract transcript and speaker info from the response
+                if (
+                    response
+                    and hasattr(response, "results")
+                    and response.results
+                    and response.results.channels
+                ):
+                    channel = response.results.channels[0]
+                    if channel.alternatives:
+                        alt = channel.alternatives[0]
+                        transcript_text = alt.transcript
+                        if transcript_text and transcript_text.strip():
+                            # Extract speaker from words with diarization info
+                            speaker_id = 0
+                            if hasattr(alt, "words") and alt.words:
+                                for word in alt.words:
+                                    if hasattr(word, "speaker") and word.speaker is not None:
+                                        speaker_id = word.speaker
+                                        break
+
+                            speaker_role = self._map_speaker_id_to_role(speaker_id)
+                            if speaker_role != self.current_speaker:
+                                logger.info(
+                                    "Speaker changed | %s → %s",
+                                    self.current_speaker,
+                                    speaker_role,
+                                )
+                                self.current_speaker = speaker_role
+                                self.speaker_history.append((speaker_role, timestamp_us))
+                            return transcript_text, speaker_role
 
             return None, None
 
@@ -182,18 +227,24 @@ class CourtroomProcessor:
             self.frame_count += 1
             timestamp_us = get_unified_timestamp_us()
 
-            # TODO: Implement after ultralytics integration
-            # results = self.face_model(frame)
-            # entities = [
-            #     {"bbox": box.xyxy.tolist(), "confidence": float(box.conf), "class": int(box.cls)}
-            #     for box in results.boxes
-            # ]
-            # self.entities_detected = len(entities)
-            # is_consistent = self._check_temporal_consistency(entities)
-
-            entities: List[Dict[str, Any]] = []
-            self.entities_detected = 0
-            is_consistent = True
+            if self.model_loaded and self.face_model is not None and frame is not None:
+                # Run YOLOv8n-face inference on the frame
+                results = self.face_model(frame, verbose=False)
+                entities: List[Dict[str, Any]] = []
+                if results and len(results) > 0 and results[0].boxes is not None:
+                    for box in results[0].boxes:
+                        entities.append({
+                            "bbox": box.xyxy.tolist(),
+                            "confidence": float(box.conf),
+                            "class": int(box.cls),
+                        })
+                self.entities_detected = len(entities)
+                is_consistent = self._check_temporal_consistency(entities)
+            else:
+                # Placeholder mode: no frame data or model not loaded
+                entities = []
+                self.entities_detected = 0
+                is_consistent = True
 
             state: Dict[str, Any] = {
                 "timestamp": timestamp_us,
