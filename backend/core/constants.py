@@ -31,6 +31,9 @@ GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 SESSION_ID: str = os.getenv("SESSION_ID", "wemakedevs-demo-room")
 MOCK_CAMERA_STREAM: str = os.getenv("MOCK_CAMERA_STREAM", "rtsp://localhost:8554/courtcam")
 
+# Check if MOCK_CAMERA_STREAM is a local file path or RTSP stream
+IS_LOCAL_VIDEO_FILE: bool = not MOCK_CAMERA_STREAM.startswith(("rtsp://", "http://", "https://"))
+
 # ---------------------------------------------------------------------------
 # CORS (comma-separated list of allowed origins)
 # ---------------------------------------------------------------------------
