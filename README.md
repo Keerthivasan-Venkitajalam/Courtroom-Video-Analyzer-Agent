@@ -62,6 +62,179 @@ Behind the interface, Gemini Live API coordinates the entire workflow:
 
 ---
 
+## Vision Agents Integration
+
+The **Vision Agents SDK** is the core orchestration framework powering the Courtroom Video Analyzer Agent. It provides the runtime that connects live WebRTC video streams, pluggable AI models, and tool-calling capabilities into a single deployable agent — all running at the edge for sub-500ms latency.
+
+### Why Vision Agents?
+
+Traditional approaches require custom WebRTC pipelines, manual frame extraction loops, and hand-rolled LLM integrations. Vision Agents eliminates all of this boilerplate, letting us focus on the **courtroom-specific logic** rather than infrastructure. It natively supports:
+
+- Multimodal inputs (video frames + audio) from live WebRTC calls
+- Pluggable LLM backends (Gemini, OpenAI, etc.)
+- Pluggable speech processors (Deepgram STT)
+- MCP-compatible tool registration so the agent can call external search APIs
+- Stream Edge Network deployment for low-latency, geographically distributed execution
+
+### 1. Agent Orchestration — `Agent` + `getstream.Edge`
+
+In `agent.py`, the top-level `Agent` class from Vision Agents SDK is instantiated with Stream's Edge network, a Gemini Live LLM, and the local video processor. This single object manages the full lifecycle: joining the WebRTC room, receiving frames and audio, calling tools, and responding to the attorney.
+
+```python
+from vision_agents.agents import Agent, User
+import getstream
+
+agent = Agent(
+    # Enforces the critical sub-500ms connection latency requirement
+    edge=getstream.Edge(),
+    agent_user=User(name="Court Analyzer AI", id="court_agent_01"),
+    instructions=GEMINI_SYSTEM_PROMPT,  # Legal-domain system prompt
+    llm=llm,                            # gemini.Realtime LLM provider
+    processors=[processor]              # Attaches the local frame/audio pipeline
+)
+
+# Joins the WebRTC courtroom call and begins real-time analysis
+await agent.start(room_id=room_id)
+```
+
+The `edge=getstream.Edge()` argument routes all media through Stream's globally distributed edge nodes, guaranteeing that the round-trip latency from courtroom camera to agent response stays under 500ms regardless of geographic location.
+
+### 2. LLM Provider — `gemini.Realtime`
+
+The LLM backend is wired using the `gemini` plugin bundled with Vision Agents. The `fps=VIDEO_FPS` parameter (5 FPS) synchronizes the LLM's frame intake with the local processor, ensuring both components see the same frames at the same rate and avoiding temporal misalignment.
+
+```python
+from vision_agents.plugins import gemini
+
+# Synchronize frame rate with the local CourtroomProcessor
+llm = gemini.Realtime(fps=VIDEO_FPS)
+```
+
+MCP tool functions are registered directly on the LLM provider. Vision Agents then automatically injects these tools into the Gemini context so the model can call them by name:
+
+```python
+@llm.register_function(
+    description=(
+        "Search the live courtroom video for specific semantic moments, "
+        "visual evidence, or generalized actions. Use this when the user "
+        "asks about physical events or complex concepts."
+    )
+)
+async def search_video(query: str, max_results: int = 5) -> str:
+    result = await mcp.invoke_tool("search_video", {
+        "query": query,
+        "max_results": max_results
+    })
+    return result.data if result.success else f"Error: {result.error}"
+
+@llm.register_function(
+    description=(
+        "Search the verbatim transcript and dialogue for exact quotes or "
+        "keywords using BM25 and vector search. Use this for specific spoken statements."
+    )
+)
+async def search_transcript(query: str, top_k: int = 5, speaker_filter: str = None) -> str:
+    params = {"query": query, "top_k": top_k}
+    if speaker_filter:
+        params["speaker_filter"] = speaker_filter
+    result = await mcp.invoke_tool("search_transcript", params)
+    return result.data if result.success else f"Error: {result.error}"
+```
+
+When a user asks *"What did the witness say about the blue jacket?"*, Gemini automatically selects `search_transcript` and returns a grounded, timestamped answer without hallucinating.
+
+### 3. Video Processor — `VideoProcessor` Subclass
+
+`CourtroomProcessor` in `processor.py` extends the Vision Agents `VideoProcessor` base class. Vision Agents calls `process_frame` on every decoded frame at the configured FPS and `process_audio_chunk` on every audio chunk, injecting the outputs into the agent's context alongside the LLM's reasoning stream.
+
+```python
+from vision_agents.processor import VideoProcessor
+from vision_agents.plugins import deepgram
+
+class CourtroomProcessor(VideoProcessor):
+    """
+    Vision Agents hook executed sequentially on every video frame at 5 FPS.
+    Runs YOLOv8n-face inference and emits a visual-state dictionary that
+    prevents the LLM from 'belief drift' about who is present in frame.
+    """
+    def __init__(self, fps: int = VIDEO_FPS):
+        super().__init__(fps=fps)
+        # Lightweight face/entity detection — offloads heavy semantic indexing
+        # to Twelve Labs so local inference stays within the latency budget
+        self.face_model = ultralytics.YOLO("yolov8n-face.pt")
+        # Deepgram STT with speaker diarization wired through Vision Agents plugin
+        self.speaker_diarization = deepgram.STT(
+            api_key=DEEPGRAM_API_KEY,
+            diarize=True,
+            punctuate=True,
+            model="nova-2"
+        )
+```
+
+**`process_frame`** — called by Vision Agents on every video frame:
+
+```python
+async def process_frame(self, frame, timestamp: float) -> dict:
+    # Run YOLOv8n-face inference for entity detection
+    results = self.face_model(frame)
+    entities = [{"bbox": box.xyxy.tolist(), "confidence": float(box.conf)}
+                for box in results.boxes]
+
+    # Emit visual state metadata — prevents the LLM from 'belief drift'
+    return {
+        "timestamp": get_unified_timestamp_us(),
+        "entities_visible": len(entities),
+        "inferred_speaker": self.current_speaker,
+        "frame_number": self.frame_count,
+        "consistent": self._check_temporal_consistency(entities)
+    }
+```
+
+**`process_audio_chunk`** — called by Vision Agents on every audio chunk:
+
+```python
+async def process_audio_chunk(self, audio_data: bytes):
+    # Deepgram diarization via Vision Agents plugin
+    transcript_data = await self.speaker_diarization.transcribe(audio_data)
+    speaker_role = self._map_speaker_id_to_role(transcript_data.speaker)
+    # Text/speaker tuple is routed to TurboPuffer memory by the agent loop
+    return transcript_data.text, speaker_role
+```
+
+### 4. Speech Processing — `deepgram.STT` Plugin
+
+The Deepgram plugin from `vision_agents.plugins` is used inside `CourtroomProcessor` to perform real-time speech-to-text with **speaker diarization**. It runs inside the Vision Agents audio processing pipeline so transcripts are aligned with video timestamps automatically. The numeric speaker IDs returned by Deepgram are mapped to courtroom roles (Judge, Witness, Prosecution, Defense) using the `SPEAKER_ROLES` dictionary from `constants.py`.
+
+### 5. Built-in Memory via Stream Chat
+
+Vision Agents leverages Stream Chat infrastructure as a **built-in memory layer**. Conversation history is stored in the chat channel associated with the WebRTC room, enabling the agent to:
+
+- Recall context across multiple queries in the same session
+- Answer follow-up questions (*"What about the next objection?"*)
+- Track which video clips have already been reviewed
+- Understand temporal references such as "earlier" or "after the recess"
+
+This means no external vector store is needed for conversational context — Stream Chat handles it natively within the Vision Agents runtime.
+
+### Integration Summary
+
+| Vision Agents Component | Role in This Project |
+|---|---|
+| `Agent` | Top-level orchestrator; joins WebRTC room on Stream Edge |
+| `getstream.Edge()` | Enforces sub-500ms round-trip latency via Stream CDN |
+| `gemini.Realtime(fps=5)` | Gemini Live API LLM with frame-synchronised video input |
+| `@llm.register_function` | MCP tool registration for `search_video` / `search_transcript` |
+| `VideoProcessor` (subclassed) | Frame-by-frame YOLO entity detection at 5 FPS |
+| `deepgram.STT` | Real-time speech-to-text with speaker diarization |
+| Stream Chat memory | Conversational context across multi-turn attorney queries |
+
+> **Install Vision Agents:**
+> ```bash
+> uv add 'vision-agents[getstream, openai]'
+> ```
+
+---
+
 ## System Architecture
 
 The Courtroom Video Analyzer Agent follows a **layered architecture** where specialized components coordinate through a central orchestrator.
