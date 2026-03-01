@@ -69,3 +69,7 @@ credentials/
 
 # OBS Studio
 *.obs
+
+# Generated output / tuning results
+rrf_tuning_results.json
+*_results.json

@@ -1,15 +1,20 @@
 """
 demo.py
-1-click launch script designed for the WeMakeDevs hackathon presentation.
-Initializes the Vision Agent backend subprocesses and serves a minimal React frontend.
+1-click launch script for the WeMakeDevs hackathon presentation.
+Initialises the Vision Agent backend subprocesses and serves the React frontend.
 """
 import asyncio
 import subprocess
 import sys
 from pathlib import Path
 
-from agent import start_courtroom_agent
-from constants import SESSION_ID, MOCK_CAMERA_STREAM
+from backend.core.logging_config import configure_logging, get_logger
+from backend.agent.agent import start_courtroom_agent
+from backend.core.constants import SESSION_ID, MOCK_CAMERA_STREAM
+
+configure_logging()
+logger = get_logger(__name__)
+
 
 
 async def main():
