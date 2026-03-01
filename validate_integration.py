@@ -201,7 +201,7 @@ def main():
         print("\n✅ All validations passed!")
         print("\nNext steps:")
         print("1. Start the API server: python api_server.py")
-        print("2. Start the frontend: cd frontend && npm run dev")
+        print("2. Start the frontend: cd frontend && pnpm run dev")
         print("3. Run integration tests: python test_integration.py")
         print("\nTask 9.1 implementation complete!")
         return True

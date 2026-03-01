@@ -23,14 +23,14 @@ async def main():
     frontend_path = Path("frontend")
     if not frontend_path.exists():
         print("⚠️  Frontend directory not found. Skipping frontend launch.")
-        print("   Run 'npm create vite@latest frontend -- --template react-ts' to create it.")
+        print("   Run 'pnpm create vite frontend --template react-ts' to create it.")
         frontend_process = None
     else:
         # 1. Start the frontend client UI (React application using Stream Video SDK)
         print("[1/2] Starting Stream frontend UI client...")
         try:
             frontend_process = subprocess.Popen(
-                ["npm", "run", "dev"],
+                ["pnpm", "run", "dev"],
                 cwd="./frontend",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE

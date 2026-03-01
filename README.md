@@ -268,13 +268,15 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. **Install Python dependencies**:
 ```bash
-pip install -r requirements.txt
+pip install uv
+uv pip install -r requirements.txt
 ```
 
 4. **Install frontend dependencies**:
 ```bash
 cd frontend
-npm install
+npm install -g pnpm
+pnpm install
 cd ..
 ```
 
@@ -324,7 +326,7 @@ python agent.py
 **Start the frontend** (in a third terminal):
 ```bash
 cd frontend
-npm run dev
+pnpm run dev
 ```
 
 **Open your browser**:
@@ -522,7 +524,7 @@ To achieve sub-500ms query response time:
 
 | Issue | Solution |
 | :--- | :--- |
-| **"Module not found" errors** | Ensure all dependencies are installed: `pip install -r requirements.txt` |
+| **"Module not found" errors** | Ensure all dependencies are installed: `uv pip install -r requirements.txt` |
 | **RTSP stream not connecting** | Verify FFmpeg is installed and RTSP_URL is correct in `.env` |
 | **API authentication failures** | Check all API keys in `.env` file, ensure no trailing spaces |
 | **Frontend not connecting** | Verify backend is running on port 8000, check CORS settings |
@@ -538,7 +540,7 @@ python agent.py --debug
 
 # Frontend
 cd frontend
-npm run dev -- --debug
+pnpm run dev -- --debug
 ```
 
 ---

@@ -1,0 +1,39 @@
+[project]
+name = "courtroom-video-analyzer-agent"
+version = "0.1.0"
+description = "Real-time multimodal AI system for legal proceedings analysis"
+requires-python = ">=3.12"
+dependencies = [
+    # Vision Agents SDK with Stream and OpenAI support
+    "vision-agents[getstream,openai]",
+
+    # Video Intelligence
+    "videodb",
+    "twelvelabs",
+
+    # Speech-to-Text
+    "deepgram-sdk",
+
+    # Search and RAG
+    "turbopuffer",
+
+    # Computer Vision
+    "ultralytics",
+    "opencv-python",
+
+    # API Server
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+
+    # Utilities
+    "python-dotenv",
+    "asyncio",
+    "aiohttp",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
