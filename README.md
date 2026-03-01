@@ -11,9 +11,36 @@
 [![Python](https://img.shields.io/badge/Python-3.9+-yellow?style=for-the-badge&logo=python)](https://python.org)
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
 
-[About](#about-the-project) • [Tech Stack](#tech-stack) • [Architecture](#system-architecture) • [Getting Started](#getting-started) • [Performance](#performance-metrics)
+[About](#about-the-project) • [Quick Start](#quick-start) • [Tech Stack](#tech-stack) • [Architecture](#system-architecture) • [Getting Started](#getting-started) • [Performance](#performance-metrics)
 
 </div>
+
+---
+
+## Quick Start
+
+**Get up and running in 2 minutes with direct video file usage (no RTSP setup needed):**
+
+```bash
+# 1. Clone and navigate
+git clone https://github.com/Keerthivasan-Venkitajalam/Courtroom-Video-Analyzer-Agent.git
+cd Courtroom-Video-Analyzer-Agent
+git checkout test
+
+# 2. Install dependencies
+brew install uv pnpm
+cd frontend && pnpm install && cd ..
+
+# 3. Configure your video file in .env
+# MOCK_CAMERA_STREAM=/path/to/your/video.mp4
+
+# 4. Start the demo
+./start_demo.sh
+```
+
+**That's it!** Open http://localhost:5173 and start querying your video.
+
+For detailed setup instructions, see [QUICK_START.md](QUICK_START.md).
 
 ---
 
