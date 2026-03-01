@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 # API Keys
 # ---------------------------------------------------------------------------
 STREAM_API_KEY: str | None = os.getenv("STREAM_API_KEY")
-STREAM_SECRET: str | None = os.getenv("STREAM_SECRET")
+STREAM_API_SECRET: str | None = os.getenv("STREAM_API_SECRET")
 TWELVE_LABS_API_KEY: str | None = os.getenv("TWELVE_LABS_API_KEY")
 VIDEODB_API_KEY: str | None = os.getenv("VIDEODB_API_KEY")
 DEEPGRAM_API_KEY: str | None = os.getenv("DEEPGRAM_API_KEY")
@@ -207,7 +207,7 @@ def validate_environment() -> None:
     """
     required_keys = {
         "STREAM_API_KEY": STREAM_API_KEY,
-        "STREAM_SECRET": STREAM_SECRET,
+        "STREAM_API_SECRET": STREAM_API_SECRET,
         "TWELVE_LABS_API_KEY": TWELVE_LABS_API_KEY,
         "VIDEODB_API_KEY": VIDEODB_API_KEY,
         "DEEPGRAM_API_KEY": DEEPGRAM_API_KEY,

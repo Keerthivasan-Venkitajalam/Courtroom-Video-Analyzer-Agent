@@ -5,27 +5,21 @@ description = "Real-time multimodal AI system for legal proceedings analysis"
 requires-python = ">=3.12"
 dependencies = [
     # Vision Agents SDK with Stream and OpenAI support
-    "vision-agents[gemini,deepgram,elevenlabs,getstream]",
-
+    "vision-agents[deepgram,elevenlabs,gemini,getstream]",
     # Video Intelligence
     "videodb",
     "twelvelabs",
-
     # Speech-to-Text
     "deepgram-sdk",
-
     # Search and RAG
     "turbopuffer",
-
     # Computer Vision
     "ultralytics",
     "opencv-python",
-
     # API Server
     "fastapi",
     "uvicorn[standard]",
     "pydantic",
-
     # Utilities
     "python-dotenv",
     "aiohttp",
