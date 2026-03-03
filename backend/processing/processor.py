@@ -5,12 +5,13 @@ Handles local frame-by-frame analysis (face detection) and the Deepgram
 STT diarisation pipeline for real-time memory ingestion.
 """
 import asyncio
+import io
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 import time
 
 from ultralytics import YOLO
-from deepgram import DeepgramClient
+from deepgram import DeepgramClient, PrerecordedOptions
 
 from backend.core.logging_config import get_logger
 from backend.core.constants import VIDEO_FPS, SPEAKER_ROLES, get_unified_timestamp_us, DEEPGRAM_API_KEY
@@ -156,11 +157,13 @@ class CourtroomProcessor:
                 # Deepgram SDK v6.x: client.listen.v1.media.transcribe_file(...)
                 response = await asyncio.to_thread(
                     self.deepgram_client.listen.v1.media.transcribe_file,
-                    request=audio_data,
-                    model="nova-3",
-                    smart_format=True,
-                    punctuate=True,
-                    diarize=True,
+                    io.BytesIO(audio_data),
+                    PrerecordedOptions(
+                        model="nova-3",
+                        smart_format=True,
+                        punctuate=True,
+                        diarize=True,
+                    ),
                 )
 
                 # Extract transcript and speaker info from the response

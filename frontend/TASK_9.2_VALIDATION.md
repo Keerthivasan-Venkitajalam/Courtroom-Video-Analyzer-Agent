@@ -13,15 +13,15 @@ This document validates the implementation of Task 9.2 from the courtroom-video-
 The ChatPanel component now properly parses the structured JSON response:
 
 ```typescript
-const transcriptResults: TranscriptResult[] = queryResult.transcriptResults || []
-const videoClips: VideoClip[] = queryResult.videoClips || []
-const totalLatencyMs = queryResult.totalLatencyMs || 0
+const transcriptResults: TranscriptResult[] = queryResult.transcript_results || []
+const videoClips: VideoClip[] = queryResult.video_clips || []
+const totalLatencyMs = queryResult.total_latency_ms || 0
 ```
 
 **Validation**: The component extracts all required fields from the query result:
-- `transcriptResults`: Array of transcript matches with segments, matched terms, and relevance scores
-- `videoClips`: Array of video clips with HLS URLs, timestamps, and durations
-- `totalLatencyMs`: Query processing time in milliseconds
+- `transcript_results`: Array of transcript matches with segments, matched terms, and relevance scores
+- `video_clips`: Array of video clips with HLS URLs, timestamps, and durations
+- `total_latency_ms`: Query processing time in milliseconds
 
 ### 2. Pass HLS URL to Secondary HLS Player Canvas ✓
 
@@ -31,8 +31,8 @@ When video clips are received, the HLS URL is passed to the video player:
 
 ```typescript
 // Auto-play the first clip if available
-if (videoClips.length > 0 && videoClips[0].hls_manifest_url) {
-  onClipSelect(videoClips[0].hls_manifest_url)
+if (videoClips.length > 0 && videoClips[0].hls_url) {
+  onClipSelect(videoClips[0].hls_url)
 }
 ```
 
@@ -162,16 +162,12 @@ function highlightMatches(text: string, matchedTerms: string[]): React.ReactElem
 ### TranscriptResult Interface
 ```typescript
 interface TranscriptResult {
-  segment: {
-    text: string
-    speaker: {
-      role: string
-    }
-    start_timestamp_us: number
-    end_timestamp_us: number
-  }
-  matched_terms: string[]
+  segment_id: string
+  text: string
+  speaker: string
+  timestamp_us: number
   relevance_score: number
+  matched_terms?: string[]
 }
 ```
 
@@ -179,7 +175,7 @@ interface TranscriptResult {
 ```typescript
 interface VideoClip {
   clip_id: string
-  hls_manifest_url: string
+  hls_url: string
   start_timestamp_us: number
   end_timestamp_us: number
   duration_ms: number
@@ -191,7 +187,7 @@ interface VideoClip {
 ### Build Verification
 ```bash
 cd frontend
-npm run build
+pnpm run build
 ```
 
 **Result**: ✓ Build successful with no TypeScript errors
@@ -230,31 +226,27 @@ npm run build
 
 ```json
 {
-  "queryId": "query_1234567890",
-  "transcriptResults": [
+  "query_id": "query_1234567890",
+  "transcript_results": [
     {
-      "segment": {
-        "text": "The witness testified about the contract dispute.",
-        "speaker": {
-          "role": "Witness"
-        },
-        "start_timestamp_us": 1234567890000000,
-        "end_timestamp_us": 1234567895000000
-      },
-      "matched_terms": ["contract"],
-      "relevance_score": 0.92
+      "segment_id": "seg_1234567890000000",
+      "text": "The witness testified about the contract dispute.",
+      "speaker": "Witness",
+      "timestamp_us": 1234567890000000,
+      "relevance_score": 0.92,
+      "matched_terms": ["contract"]
     }
   ],
-  "videoClips": [
+  "video_clips": [
     {
-      "clip_id": "clip_001",
-      "hls_manifest_url": "https://example.com/clips/clip_001.m3u8",
+      "clip_id": "clip_0_1234567890000000",
+      "hls_url": "https://example.com/clips/clip_001.m3u8",
       "start_timestamp_us": 1234567890000000,
       "end_timestamp_us": 1234567920000000,
       "duration_ms": 30000
     }
   ],
-  "totalLatencyMs": 425
+  "total_latency_ms": 425
 }
 ```
 

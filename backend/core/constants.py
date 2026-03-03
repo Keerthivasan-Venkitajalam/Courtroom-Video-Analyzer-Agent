@@ -52,6 +52,10 @@ EPOCH_OFFSET_US: int = int(time.time() * 1_000_000)  # Microseconds since Unix e
 VIDEO_FPS: int = 5          # Process video at 5 FPS to conserve compute
 CHUNK_SIZE: int = 1000      # TurboPuffer chunk size (characters)
 CHUNK_OVERLAP: int = 100    # TurboPuffer chunk overlap (characters)
+GEMINI_LIVE_MODEL: str = os.getenv(
+    "GEMINI_LIVE_MODEL",
+    "gemini-2.5-flash-native-audio-preview-12-2025",
+)
 
 # ---------------------------------------------------------------------------
 # Hybrid Search Configuration (Reciprocal Rank Fusion)

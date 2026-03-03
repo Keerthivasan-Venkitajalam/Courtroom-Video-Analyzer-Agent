@@ -14,6 +14,7 @@ from backend.core.logging_config import configure_logging, get_logger
 from backend.core.constants import (
     VIDEO_FPS,
     GEMINI_SYSTEM_PROMPT,
+    GEMINI_LIVE_MODEL,
 )
 from backend.indexing.indexer import CourtroomIndexer
 from backend.indexing.ingestion import TranscriptIngestion
@@ -67,7 +68,7 @@ class CourtroomAgentOrchestrator:
             
             # Create a live LLM model hook for the agent
             llm = gemini.Realtime(
-                model="gemini-2.5-flash-native-audio-preview-12-2025", 
+                model=GEMINI_LIVE_MODEL,
                 fps=VIDEO_FPS,
             )
             
