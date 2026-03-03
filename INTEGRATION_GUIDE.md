@@ -5,6 +5,7 @@
 This guide covers the frontend-to-backend integration for the Courtroom Video Analyzer, implementing Task 9.1 from the specification.
 
 **Validates:**
+
 - Property 2: End-to-end query latency (≤500ms)
 - Property 40: Query routing to appropriate components
 
@@ -34,6 +35,7 @@ Frontend (React)          Backend (FastAPI)           Agent Layer
 FastAPI server that handles query requests from the frontend.
 
 **Key Features:**
+
 - CORS enabled for frontend communication
 - Async query processing
 - Latency tracking and logging
@@ -41,6 +43,7 @@ FastAPI server that handles query requests from the frontend.
 - HLS URL generation
 
 **Endpoints:**
+
 - `GET /` - Health check
 - `GET /health` - Detailed health status
 - `POST /api/query` - Process natural language queries
@@ -52,6 +55,7 @@ FastAPI server that handles query requests from the frontend.
 React component that sends queries to the backend.
 
 **Key Features:**
+
 - Async query submission
 - Latency measurement
 - Error handling with fallback
@@ -60,6 +64,7 @@ React component that sends queries to the backend.
 ### 3. MCP Server Integration
 
 The API server uses the existing MCP server to route queries to:
+
 - `search_transcript` - TurboPuffer hybrid search
 - `search_video` - Twelve Labs video intelligence
 
@@ -125,17 +130,18 @@ Content-Type: application/json
 
 ```bash
 # Install Python dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Install frontend dependencies
 cd frontend
-npm install
+pnpm install
 cd ..
 ```
 
 ### 2. Configure Environment
 
 Ensure `.env` file contains:
+
 ```
 STREAM_API_KEY=your_stream_api_key
 STREAM_SECRET=your_stream_secret
@@ -160,7 +166,7 @@ The API server will start on `http://localhost:8000`
 
 ```bash
 cd frontend
-npm run dev
+pnpm run dev
 ```
 
 The frontend will start on `http://localhost:5173`
@@ -189,6 +195,7 @@ python test_integration.py
 ```
 
 The test suite validates:
+
 - API server health
 - Query endpoint functionality
 - Response format correctness
@@ -218,6 +225,7 @@ The system logs latency at multiple levels:
 3. **Component-level**: Tracks individual component latencies
 
 Latency warnings are logged when:
+
 - Total latency exceeds 500ms
 - Any component exceeds its budget
 - Network latency is unusually high
@@ -227,21 +235,27 @@ Latency warnings are logged when:
 The system routes queries to appropriate components based on query type:
 
 ### Multimodal Queries
+
 Queries that require both transcript and video search:
+
 - "What did the witness say about the contract?"
 - "Show me when the judge mentioned the evidence"
 
 **Routing**: Both `search_transcript` and `search_video`
 
 ### Visual Queries
+
 Queries focused on visual content:
+
 - "Show me when the judge entered"
 - "Find the moment the document was presented"
 
 **Routing**: Primarily `search_video`
 
 ### Transcript Queries
+
 Queries focused on spoken content:
+
 - "Find the objection from the defense"
 - "What did the prosecutor say about intent?"
 
@@ -274,15 +288,17 @@ The frontend handles errors with fallback behavior:
 **Issue**: `ModuleNotFoundError` or import errors
 
 **Solution**: Install dependencies
+
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ### Frontend Can't Connect
 
 **Issue**: CORS errors or connection refused
 
-**Solution**: 
+**Solution**:
+
 1. Verify API server is running on port 8000
 2. Check CORS configuration in `api_server.py`
 3. Ensure frontend is using correct API URL
@@ -292,6 +308,7 @@ pip install -r requirements.txt
 **Issue**: Queries exceed 500ms threshold
 
 **Solution**:
+
 1. Check component latencies in logs
 2. Verify indexer is initialized
 3. Check network latency
@@ -302,6 +319,7 @@ pip install -r requirements.txt
 **Issue**: Empty transcript_results and video_results
 
 **Solution**:
+
 1. Verify indexer has indexed content
 2. Check MCP tool invocation logs
 3. Test MCP tools directly: `GET /api/tools`

@@ -3,16 +3,12 @@ import './ChatPanel.css'
 import Logo from '../assets/Logo.svg'
 
 interface TranscriptResult {
-  segment: {
-    text: string
-    speaker: {
-      role: string
-    }
-    start_timestamp_us: number
-    end_timestamp_us: number
-  }
-  matched_terms: string[]
+  segment_id: string
+  text: string
+  speaker: string
+  timestamp_us: number
   relevance_score: number
+  matched_terms?: string[]
 }
 
 interface VideoClip {
@@ -50,14 +46,14 @@ function highlightMatches(text: string, matchedTerms: string[]): React.ReactElem
   const pattern = matchedTerms
     .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) // Escape special chars
     .join('|')
-  
+
   const regex = new RegExp(`(${pattern})`, 'gi')
   const parts = text.split(regex)
 
   return (
     <>
       {parts.map((part, index) => {
-        const isMatch = matchedTerms.some(term => 
+        const isMatch = matchedTerms.some(term =>
           part.toLowerCase() === term.toLowerCase()
         )
         return isMatch ? (
@@ -75,24 +71,24 @@ function formatTimestamp(timestampUs: number): string {
   const seconds = Math.floor(timestampUs / 1000000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
-  
+
   const displayHours = hours % 24
   const displayMinutes = minutes % 60
   const displaySeconds = seconds % 60
-  
+
   if (hours > 0) {
     return `${displayHours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`
   }
   return `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`
 }
 
-export default function ChatPanel({ 
-  onQuerySubmit, 
-  isLoading, 
+export default function ChatPanel({
+  onQuerySubmit,
+  isLoading,
   queryResult,
-  onClipSelect 
+  onClipSelect
 }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: '1',
       type: 'agent',
@@ -106,7 +102,7 @@ export default function ChatPanel({
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
+      messagesEndRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
         inline: 'nearest'
@@ -121,9 +117,9 @@ export default function ChatPanel({
   useEffect(() => {
     if (queryResult) {
       // Parse the structured JSON payload from agent
-      const transcriptResults: TranscriptResult[] = queryResult.transcriptResults || []
-      const videoClips: VideoClip[] = queryResult.videoClips || []
-      const totalLatencyMs = queryResult.totalLatencyMs || 0
+      const transcriptResults: TranscriptResult[] = queryResult.transcript_results || []
+      const videoClips: VideoClip[] = queryResult.video_clips || []
+      const totalLatencyMs = queryResult.total_latency_ms || 0
 
       // Generate response text based on results
       let responseText = ''
@@ -133,7 +129,7 @@ export default function ChatPanel({
           responseText += ` and ${videoClips.length} video clip${videoClips.length !== 1 ? 's' : ''}`
         }
         responseText += '.'
-        
+
         // Add latency info
         if (totalLatencyMs > 0) {
           responseText += ` (${totalLatencyMs}ms)`
@@ -151,7 +147,7 @@ export default function ChatPanel({
         videoClips,
         totalLatencyMs
       }
-      
+
       setMessages(prev => [...prev, agentMessage])
 
       // Auto-play the first clip if available
@@ -189,7 +185,7 @@ export default function ChatPanel({
           <img src={Logo} alt="Logo" className="panel-logo" />
           <h3>Query Assistant</h3>
         </div>
-        <button 
+        <button
           className={`voice-btn ${isVoiceMode ? 'active' : ''}`}
           onClick={handleVoiceToggle}
           title="Toggle voice mode"
@@ -203,7 +199,7 @@ export default function ChatPanel({
           <div key={message.id} className={`message ${message.type}`}>
             <div className="message-content">
               <p>{message.text}</p>
-              
+
               {/* Display transcript results with highlighting */}
               {message.transcriptResults && message.transcriptResults.length > 0 && (
                 <div className="transcript-results">
@@ -211,16 +207,16 @@ export default function ChatPanel({
                   {message.transcriptResults.map((result, idx) => (
                     <div key={idx} className="transcript-result">
                       <div className="result-header">
-                        <span className="speaker-label">{result.segment.speaker.role}</span>
+                        <span className="speaker-label">{result.speaker}</span>
                         <span className="timestamp">
-                          {formatTimestamp(result.segment.start_timestamp_us)}
+                          {formatTimestamp(result.timestamp_us)}
                         </span>
                         <span className="relevance-score">
                           {(result.relevance_score * 100).toFixed(0)}% match
                         </span>
                       </div>
                       <div className="result-text">
-                        {highlightMatches(result.segment.text, result.matched_terms)}
+                        {highlightMatches(result.text, result.matched_terms || [])}
                       </div>
                     </div>
                   ))}
@@ -276,8 +272,8 @@ export default function ChatPanel({
           onChange={(e) => setInputValue(e.target.value)}
           disabled={isLoading}
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="send-btn"
           disabled={isLoading || !inputValue.trim()}
         >

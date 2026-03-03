@@ -1,0 +1,44 @@
+[project]
+name = "courtroom-video-analyzer-agent"
+version = "0.1.0"
+description = "Real-time multimodal AI system for legal proceedings analysis"
+requires-python = ">=3.12"
+dependencies = [
+    # Vision Agents SDK with Stream and OpenAI support
+    "vision-agents[deepgram,elevenlabs,gemini,getstream]",
+    # Video Intelligence
+    "videodb",
+    "twelvelabs",
+    # Speech-to-Text
+    "deepgram-sdk",
+    # Search and RAG
+    "turbopuffer",
+    # Computer Vision
+    "ultralytics",
+    "opencv-python",
+    # API Server
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    # Utilities
+    "python-dotenv",
+    "aiohttp",
+    # Note: asyncio is part of the Python standard library — not installed via pip
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "requests>=2.31",      # Used by integration tests
+    "httpx>=0.27",         # Used by FastAPI TestClient
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+log_cli = true
+log_cli_level = "INFO"

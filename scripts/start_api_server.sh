@@ -20,4 +20,4 @@ elif [ -d ".venv" ]; then
 fi
 
 # Start the API server
-python api_server.py
+python -m backend.api.server
