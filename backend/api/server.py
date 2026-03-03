@@ -187,8 +187,6 @@ async def get_stream_token(req: TokenRequest):
     """
     Generate a Stream JWT token so the frontend can join the Stream Edge room.
     """
-    _require_ready()
-    
     if not _stream_client:
         raise HTTPException(
             status_code=503, 
@@ -215,55 +213,69 @@ async def process_query(request: QueryRequest):
     query_id = f"query_{int(time.time() * 1000)}"
 
     try:
-        (transcript_result, video_result) = await asyncio.gather(
-            _mcp_server.invoke_tool("search_transcript", {"query": request.query, "top_k": 5}),
-            _mcp_server.invoke_tool("search_video",      {"query": request.query, "max_results": 5}),
+        component_latencies = {}
+
+        async def timed_indexer_call(coro, key: str):
+            start = time.monotonic()
+            result = await coro
+            duration_ms = int((time.monotonic() - start) * 1000)
+            component_latencies[key] = duration_ms
+            return result
+
+        raw_transcripts, raw_videos = await asyncio.gather(
+            timed_indexer_call(
+                _indexer.query_transcript(request.query, top_k=5),
+                "transcript_search",
+            ),
+            timed_indexer_call(
+                _indexer.query_video_moments(request.query),
+                "video_search",
+            ),
         )
 
-        component_latencies = {}
-        transcript_results: list[TranscriptResult] = []
-        if transcript_result.success:
-            raw_transcripts = await _indexer.query_transcript(request.query, top_k=5)
-            transcript_results = [
-                TranscriptResult(
-                    segment_id=f"seg_{r['timestamp_us']}",
-                    text=r["text"],
-                    speaker=r["speaker"],
-                    timestamp_us=r["timestamp_us"],
-                    relevance_score=r["relevance_score"],
-                )
-                for r in raw_transcripts
-            ]
+        transcript_results: list[TranscriptResult] = [
+            TranscriptResult(
+                segment_id=f"seg_{r['timestamp_us']}",
+                text=r["text"],
+                speaker=r["speaker"],
+                timestamp_us=r["timestamp_us"],
+                relevance_score=r["relevance_score"],
+            )
+            for r in raw_transcripts
+        ]
 
         video_results: list[VideoMatch] = []
         video_clips: list[VideoClip] = []
-        if video_result.success:
-            raw_videos = await _indexer.query_video_moments(request.query)
-            for i, r in enumerate(raw_videos[:5]):
-                ts_us = int(r.start_time * 1_000_000)
-                video_results.append(VideoMatch(
+        for i, r in enumerate(raw_videos[:5]):
+            ts_us = int(r.start_time * 1_000_000)
+            video_results.append(
+                VideoMatch(
                     frame_id=f"frame_{ts_us}",
                     timestamp_us=ts_us,
                     start_time=r.start_time,
                     end_time=r.end_time,
                     description=r.description,
                     relevance_score=0.85,
-                ))
-                video_clips.append(VideoClip(
+                )
+            )
+            video_clips.append(
+                VideoClip(
                     clip_id=f"clip_{i}_{ts_us}",
                     start_timestamp_us=ts_us,
                     end_timestamp_us=int(r.end_time * 1_000_000),
                     duration_ms=int((r.end_time - r.start_time) * 1000),
                     hls_url=r.stream_url,
-                ))
+                )
+            )
 
         total_latency_ms = int((time.monotonic() - start_time) * 1000)
-        component_latencies["transcript_search"] = transcript_result.execution_time_ms
-        component_latencies["video_search"] = video_result.execution_time_ms
 
         logger.info(
             "Query processed | id=%s latency=%dms transcript=%d video=%d",
-            query_id, total_latency_ms, len(transcript_results), len(video_results),
+            query_id,
+            total_latency_ms,
+            len(transcript_results),
+            len(video_results),
         )
 
         return QueryResponse(

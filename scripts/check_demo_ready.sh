@@ -46,7 +46,7 @@ if [ -f ".env" ]; then
     fi
     
     # Check for required API keys
-    if grep -q "STREAM_API_KEY=x563t6g4ysy7" .env; then
+    if grep -q "^STREAM_API_KEY=.\+" .env; then
         echo "✅ Stream API key configured"
     else
         echo "⚠️  Stream API key might not be configured"
